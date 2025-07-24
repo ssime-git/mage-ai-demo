@@ -1,0 +1,1 @@
+{"customer_id": "unknown", "prediction": 0, "prediction_text": "Will Stay", "churn_probability": 0.15, "stay_probability": 0.85, "confidence": 0.85, "risk_level": "Low", "model_version": "v_20250522_071740", "timestamp": "2025-05-22 11:21:08.831195"}

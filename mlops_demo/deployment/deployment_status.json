@@ -1,0 +1,8 @@
+{
+  "model_deployed": true,
+  "deployment_timestamp": "2025-05-22 11:24:52.527367",
+  "model_accuracy": 0.0,
+  "model_auc": 0.0,
+  "model_path": "/home/src/mlops_demo/models/churn_model.pkl",
+  "status": "ready_for_predictions"
+}

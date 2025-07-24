@@ -1,0 +1,3 @@
+{"operation": "create", "resource": {"type": "pipeline", "uuid": "demo_mlops"}, "timestamp": 1747896722, "user": null}
+{"operation": "create", "resource": {"type": "pipeline", "uuid": "prediction_pipeline"}, "timestamp": 1747898904, "user": null}
+{"operation": "create", "resource": {"type": "pipeline", "uuid": "online_prediction"}, "timestamp": 1747901134, "user": null}

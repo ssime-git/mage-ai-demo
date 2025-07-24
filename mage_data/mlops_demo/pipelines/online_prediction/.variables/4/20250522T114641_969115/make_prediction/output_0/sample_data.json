@@ -1,0 +1,1 @@
+{"customer_id": "QUICK_TEST", "prediction": 0, "prediction_text": "Will Stay", "churn_probability": 0.495, "stay_probability": 0.505, "confidence": 0.505, "risk_level": "Medium", "model_version": "v_20250522_112442", "timestamp": "2025-05-22 11:46:44.176708"}

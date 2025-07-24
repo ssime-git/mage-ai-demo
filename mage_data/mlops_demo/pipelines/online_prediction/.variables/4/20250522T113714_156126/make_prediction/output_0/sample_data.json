@@ -1,0 +1,1 @@
+{"customer_id": "VIP_001", "prediction": 1, "prediction_text": "Will Churn", "churn_probability": 0.77, "stay_probability": 0.23, "confidence": 0.77, "risk_level": "High", "model_version": "v_20250522_112442", "timestamp": "2025-05-22 11:37:22.931260"}

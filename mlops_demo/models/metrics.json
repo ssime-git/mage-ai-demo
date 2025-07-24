@@ -1,0 +1,19 @@
+{
+  "accuracy": 0.93,
+  "auc_score": 0.9808,
+  "feature_importance": {
+    "monthly_charges": 0.2274162405494946,
+    "payment_method_score": 0.21331943908647216,
+    "contract_length": 0.18702884884367563,
+    "customer_service_calls": 0.11007250339022914,
+    "total_charges": 0.09085844106486367,
+    "support_tickets": 0.0621932965848406,
+    "usage_frequency": 0.04492848557840757,
+    "satisfaction_score": 0.027250499078669145,
+    "account_age": 0.025332287539086097,
+    "num_services": 0.01159995828426136
+  },
+  "model_path": "/home/src/mlops_demo/models/churn_model.pkl",
+  "training_samples": 800,
+  "test_samples": 200
+}

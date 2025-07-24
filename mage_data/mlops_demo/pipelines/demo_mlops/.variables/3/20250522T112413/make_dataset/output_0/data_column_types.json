@@ -1,0 +1,1 @@
+{"account_age": "int64", "monthly_charges": "float64", "total_charges": "float64", "num_services": "int64", "customer_service_calls": "float64", "contract_length": "float64", "payment_method_score": "float64", "usage_frequency": "float64", "support_tickets": "float64", "satisfaction_score": "float64", "customer_id": "int64", "churn": "int64"}

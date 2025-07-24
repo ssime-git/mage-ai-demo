@@ -1,0 +1,134 @@
+blocks:
+- all_upstream_blocks_executed: true
+  color: null
+  configuration: {}
+  downstream_blocks:
+  - make_dataset_histogram_n2
+  - data_preproecessing
+  executor_config: null
+  executor_type: local_python
+  has_callback: false
+  language: python
+  name: make dataset
+  retry_config: null
+  status: executed
+  timeout: null
+  type: data_loader
+  upstream_blocks: []
+  uuid: make_dataset
+- all_upstream_blocks_executed: true
+  color: null
+  configuration: {}
+  downstream_blocks:
+  - model_training
+  executor_config: null
+  executor_type: local_python
+  has_callback: false
+  language: python
+  name: Data Preproecessing
+  retry_config: null
+  status: executed
+  timeout: null
+  type: transformer
+  upstream_blocks:
+  - make_dataset
+  uuid: data_preproecessing
+- all_upstream_blocks_executed: true
+  color: null
+  configuration: {}
+  downstream_blocks:
+  - model_registry
+  executor_config: null
+  executor_type: local_python
+  has_callback: false
+  language: python
+  name: Model training
+  retry_config: null
+  status: executed
+  timeout: null
+  type: transformer
+  upstream_blocks:
+  - data_preproecessing
+  uuid: model_training
+- all_upstream_blocks_executed: true
+  color: null
+  configuration:
+    file_path: data_exporters/model_registry.py
+    file_source:
+      path: data_exporters/model_registry.py
+  downstream_blocks:
+  - model_deployment
+  executor_config: null
+  executor_type: local_python
+  has_callback: false
+  language: python
+  name: Model registry
+  retry_config: null
+  status: executed
+  timeout: null
+  type: data_exporter
+  upstream_blocks:
+  - model_training
+  uuid: model_registry
+- all_upstream_blocks_executed: true
+  color: null
+  configuration: {}
+  downstream_blocks: []
+  executor_config: null
+  executor_type: local_python
+  has_callback: false
+  language: python
+  name: model_deployment
+  retry_config: null
+  status: executed
+  timeout: null
+  type: data_exporter
+  upstream_blocks:
+  - model_registry
+  uuid: model_deployment
+cache_block_output_in_memory: false
+callbacks: []
+concurrency_config: {}
+conditionals: []
+created_at: '2025-05-22 06:52:01.545651+00:00'
+data_integration: null
+description: Simple MLOPS Pipeline for demo
+executor_config: {}
+executor_count: 1
+executor_type: null
+extensions: {}
+name: demo_mlops
+notification_config: {}
+remote_variables_dir: null
+retry_config: {}
+run_pipeline_in_one_process: false
+settings:
+  triggers: null
+spark_config: {}
+tags: []
+type: python
+uuid: demo_mlops
+variables_dir: /home/src/mage_data/mlops_demo
+widgets:
+- all_upstream_blocks_executed: true
+  color: null
+  configuration:
+    buckets: 10
+    chart_type: histogram
+    group_by:
+    - account_age
+    width_percentage: '1'
+    x: x
+  downstream_blocks: []
+  executor_config: null
+  executor_type: local_python
+  has_callback: false
+  language: python
+  name: make_dataset_histogram_n2
+  retry_config: null
+  status: executed
+  timeout: null
+  type: chart
+  upstream_blocks:
+  - make_dataset
+  uuid: make_dataset_histogram_n2
