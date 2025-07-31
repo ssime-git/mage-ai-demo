@@ -1,6 +1,6 @@
 services:
   magic:
-    image: mageai/mageai:latest
+    build: .
     command: mage start mlops_demo
     environment:
       PROJECT_NAME: mlops_demo

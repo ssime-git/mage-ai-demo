@@ -1,11 +1,11 @@
-# Mage AI Prediction Makefile - WORKING VERSION WITH DATA ACCESS
+# Mage AI Prediction Makefile - Container-friendly version with jq support
 API_URL = http://localhost:6789/api/pipeline_schedules/4/pipeline_runs/0171f97ef1cf421bbc825bf90d90bc66
 BASE_URL = http://localhost:6789/api/pipeline_runs
 
 .PHONY: help
 help:
 	@echo "🔮 Mage AI Prediction Commands"
-	@echo "============================="
+	@echo "=============================="
 	@echo "make high-risk      - Test high-risk customer"
 	@echo "make low-risk       - Test low-risk customer"  
 	@echo "make medium-risk    - Test medium-risk customer"
@@ -37,7 +37,7 @@ medium-risk:
 		-d '{"pipeline_run": {"variables": {"customer_data": {"customer_id": "MEDIUM_RISK_001", "account_age": 24, "monthly_charges": 85.0, "total_charges": 2040.0, "num_services": 5, "customer_service_calls": 2, "contract_length": 12, "payment_method_score": 0.7, "usage_frequency": 0.6, "support_tickets": 1, "satisfaction_score": 0.6}}}}' \
 		| jq -r '"Run ID: " + (.pipeline_run.id | tostring)'
 
-# Show prediction result by reading the data file
+# Show prediction result by reading the data file directly
 .PHONY: show-result
 show-result:
 	@echo "🎯 Getting prediction result for run $(ID)..."
@@ -48,18 +48,26 @@ show-result:
 	echo ""; \
 	echo "🎯 PREDICTION RESULT:"; \
 	echo "====================="; \
-	docker compose exec magic cat "$$DATA_FILE" 2>/dev/null | jq '.' || echo "❌ Data file not found"
+	if [ -f "$$DATA_FILE" ]; then \
+		cat "$$DATA_FILE" | jq '.'; \
+	else \
+		echo "❌ Data file not found"; \
+	fi
 
 # Show the latest prediction result
 .PHONY: latest-result
 latest-result:
 	@echo "📊 Getting latest prediction result..."
-	@LATEST_FILE=$$(docker compose exec magic find /home/src/mage_data/mlops_demo/pipelines/online_prediction/.variables -name "data.json" -type f -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2- | tr -d '\n'); \
+	@LATEST_FILE=$$(find /home/src/mage_data/mlops_demo/pipelines/online_prediction/.variables -name "data.json" -type f -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2- | tr -d '\n'); \
 	echo "Latest file: $$LATEST_FILE"; \
 	echo ""; \
 	echo "🎯 LATEST PREDICTION RESULT:"; \
 	echo "============================"; \
-	docker compose exec magic cat "$$LATEST_FILE" 2>/dev/null | jq '.' || echo "❌ Could not read latest file"
+	if [ -f "$$LATEST_FILE" ]; then \
+		cat "$$LATEST_FILE" | jq '.'; \
+	else \
+		echo "❌ Could not find latest file"; \
+	fi
 
 # Make prediction and show result immediately
 .PHONY: predict-show
@@ -75,16 +83,20 @@ predict-show:
 .PHONY: list-files
 list-files:
 	@echo "📁 Available prediction data files:"
-	@docker compose exec magic find /home/src/mage_data/mlops_demo/pipelines/online_prediction/.variables -name "data.json" -type f | sort
+	@find /home/src/mage_data/mlops_demo/pipelines/online_prediction/.variables -name "data.json" -type f 2>/dev/null | sort || echo "❌ No data files found"
 
 # Show the raw data file content for debugging
 .PHONY: debug-file
 debug-file:
 	@echo "🔍 Debug: Latest data file content..."
-	@LATEST_FILE=$$(docker compose exec magic find /home/src/mage_data/mlops_demo/pipelines/online_prediction/.variables -name "data.json" -type f -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2- | tr -d '\n'); \
+	@LATEST_FILE=$$(find /home/src/mage_data/mlops_demo/pipelines/online_prediction/.variables -name "data.json" -type f -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2- | tr -d '\n'); \
 	echo "File: $$LATEST_FILE"; \
 	echo "Raw content:"; \
-	docker compose exec magic cat "$$LATEST_FILE" 2>/dev/null || echo "❌ Could not read file"
+	if [ -f "$$LATEST_FILE" ]; then \
+		cat "$$LATEST_FILE"; \
+	else \
+		echo "❌ Could not read file"; \
+	fi
 
 # Clean formatted display
 .PHONY: clean-result
@@ -93,14 +105,18 @@ clean-result:
 	@EXECUTION_PARTITION=$$(curl -s -X GET "$(BASE_URL)/$(ID)" -H "Content-Type: application/json" | jq -r '.pipeline_run.variables.execution_partition'); \
 	DATA_FILE="/home/src/mage_data/mlops_demo/pipelines/online_prediction/.variables/$$EXECUTION_PARTITION/make_prediction/output_0/data.json"; \
 	echo ""; \
-	RESULT=$$(docker compose exec magic cat "$$DATA_FILE" 2>/dev/null | jq -r '.' 2>/dev/null); \
-	if [ "$$RESULT" != "" ]; then \
-		echo "Customer ID: $$(echo "$$RESULT" | jq -r '.customer_id // "N/A"')"; \
-		echo "Prediction: $$(echo "$$RESULT" | jq -r '.prediction_text // "N/A"')"; \
-		echo "Risk Level: $$(echo "$$RESULT" | jq -r '.risk_level // "N/A"')"; \
-		echo "Churn Probability: $$(echo "$$RESULT" | jq -r '.churn_probability // "N/A"')"; \
-		echo "Confidence: $$(echo "$$RESULT" | jq -r '.confidence // "N/A"')"; \
-		echo "Model Version: $$(echo "$$RESULT" | jq -r '.model_version // "N/A"')"; \
+	if [ -f "$$DATA_FILE" ]; then \
+		RESULT=$$(cat "$$DATA_FILE" | jq -r '.' 2>/dev/null); \
+		if [ "$$RESULT" != "" ]; then \
+			echo "Customer ID: $$(echo "$$RESULT" | jq -r '.customer_id // "N/A"')"; \
+			echo "Prediction: $$(echo "$$RESULT" | jq -r '.prediction_text // "N/A"')"; \
+			echo "Risk Level: $$(echo "$$RESULT" | jq -r '.risk_level // "N/A"')"; \
+			echo "Churn Probability: $$(echo "$$RESULT" | jq -r '.churn_probability // "N/A"')"; \
+			echo "Confidence: $$(echo "$$RESULT" | jq -r '.confidence // "N/A"')"; \
+			echo "Model Version: $$(echo "$$RESULT" | jq -r '.model_version // "N/A"')"; \
+		else \
+			echo "❌ Could not parse prediction result"; \
+		fi; \
 	else \
-		echo "❌ Could not read prediction result"; \
+		echo "❌ Could not find prediction result file"; \
 	fi
