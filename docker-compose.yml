@@ -1,12 +1,106 @@
+version: "3.9"
+
 services:
-  magic:
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mage}
+      POSTGRES_USER: ${POSTGRES_USER:-mage}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mage}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mage}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: on-failure:5
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: on-failure:5
+
+  mage-web:
     build: .
-    command: mage start mlops_demo
+    command: ["/app/run_app.sh", "mage", "start", "mlops_demo", "--instance-type", "web_server"]
+    ports:
+      - "6789:6789"
     environment:
       PROJECT_NAME: mlops_demo
-      ENV: dev
-    ports:
-      - 6789:6789
+      ENV: ${ENV:-dev}
+      USER_CODE_PATH: /home/src
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      POSTGRES_DB: ${POSTGRES_DB:-mage}
+      POSTGRES_USER: ${POSTGRES_USER:-mage}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mage}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://mage:mage@postgres:5432/mage}
     volumes:
-      - .:/home/src/
+      - .:/home/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6789 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: on-failure:5
+
+  mage-scheduler:
+    build: .
+    command: ["/app/run_app.sh", "mage", "start", "mlops_demo", "--instance-type", "scheduler"]
+    environment:
+      PROJECT_NAME: mlops_demo
+      ENV: ${ENV:-dev}
+      USER_CODE_PATH: /home/src
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      POSTGRES_DB: ${POSTGRES_DB:-mage}
+      POSTGRES_USER: ${POSTGRES_USER:-mage}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mage}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://mage:mage@postgres:5432/mage}
+    volumes:
+      - .:/home/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python - <<'PY'\nimport socket, sys\nimport redis\n\nr = redis.from_url('${REDIS_URL:-redis://redis:6379/0}')\ntry:\n    r.ping()\n    sys.exit(0)\nexcept Exception:\n    sys.exit(1)\nPY"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: on-failure:5
+
+  prediction-service:
+    build: ./mlops_demo/prediction_service
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlops_demo/model_registry:/home/src/mlops_demo/model_registry:ro
+    environment:
+      LATEST_INFO_PATH: /home/src/mlops_demo/model_registry/latest.json
+    depends_on:
+      mage-web:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: on-failure:5
+
+volumes:
+  pgdata:
