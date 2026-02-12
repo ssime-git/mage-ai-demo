@@ -6,71 +6,70 @@ import json
 import os
 from datetime import datetime
 import joblib
+import mlflow
+import mlflow.sklearn
+from mlflow.tracking import MlflowClient
 
 @data_exporter
 def register_model(metrics: dict, *args, **kwargs) -> None:
     """
     Register model in a simple model registry
     """
-    # Create model registry directory
-    registry_path = '/home/src/mlops_demo/model_registry'
-    os.makedirs(registry_path, exist_ok=True)
-    
-    # Create model version
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    version = f"v_{timestamp}"
-    
-    # Load the trained model
+    tracking_uri = os.getenv('MLFLOW_TRACKING_URI')
+    if not tracking_uri:
+        raise Exception('MLFLOW_TRACKING_URI is not set. Please configure MLflow in your environment.')
+
+    registered_model_name = os.getenv('MLFLOW_REGISTERED_MODEL_NAME', 'churn-model')
+    experiment_name = os.getenv('MLFLOW_EXPERIMENT_NAME', 'mlops_demo')
+
+    mlflow.set_tracking_uri(tracking_uri)
+    mlflow.set_experiment(experiment_name)
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     model = joblib.load(metrics['model_path'])
-    scaler = joblib.load('/home/src/mlops_demo/models/scaler.pkl')
-    
-    # Create version directory
-    version_path = os.path.join(registry_path, version)
-    os.makedirs(version_path, exist_ok=True)
-    
-    # Save model artifacts
-    joblib.dump(model, os.path.join(version_path, 'model.pkl'))
-    joblib.dump(scaler, os.path.join(version_path, 'scaler.pkl'))
-    
-    # Update metrics with version info
-    registry_entry = {
-        'version': version,
-        'timestamp': timestamp,
-        'model_type': 'RandomForestClassifier',
-        'status': 'registered',
-        'metrics': {
-            'accuracy': metrics['accuracy'],
-            'auc_score': metrics['auc_score']
-        },
-        'feature_importance': metrics['feature_importance'],
-        'artifacts': {
-            'model_path': os.path.join(version_path, 'model.pkl'),
-            'scaler_path': os.path.join(version_path, 'scaler.pkl')
-        }
-    }
-    
-    # Save registry entry
-    with open(os.path.join(version_path, 'metadata.json'), 'w') as f:
-        json.dump(registry_entry, f, indent=2)
-    
-    # Update latest model pointer
-    latest_path = os.path.join(registry_path, 'latest.json')
-    with open(latest_path, 'w') as f:
-        json.dump({
-            'version': version,
-            'path': version_path,
-            'updated_at': timestamp
-        }, f, indent=2)
-    
-    print(f"✅ Model registered successfully!")
-    print(f"Version: {version}")
-    print(f"Registry path: {version_path}")
-    print(f"Accuracy: {metrics['accuracy']:.4f}")
-    print(f"AUC Score: {metrics['auc_score']:.4f}")
+
+    scaler_path = '/home/src/mlops_demo/models/scaler.pkl'
+    if not os.path.exists(scaler_path):
+        raise Exception(f"Scaler not found at {scaler_path}. Please run the preprocessing/training pipeline first.")
+
+    with mlflow.start_run(run_name=f"train_{timestamp}") as run:
+        run_id = run.info.run_id
+
+        mlflow.log_params({
+            'model_type': 'RandomForestClassifier',
+            'training_samples': metrics.get('training_samples'),
+            'test_samples': metrics.get('test_samples'),
+        })
+
+        mlflow.log_metrics({
+            'accuracy': float(metrics['accuracy']),
+            'auc_score': float(metrics['auc_score']),
+        })
+
+        mlflow.log_artifact(scaler_path, artifact_path='preprocess')
+
+        metrics_to_log = dict(metrics)
+        mlflow.log_dict(metrics_to_log, 'training_metrics.json')
+
+        model_info = mlflow.sklearn.log_model(
+            sk_model=model,
+            artifact_path='model',
+            registered_model_name=registered_model_name,
+        )
+
+        print('✅ Model logged and registered in MLflow!')
+        print(f"Run ID: {run_id}")
+        print(f"Registered model: {registered_model_name}")
+        print(f"Model URI: {model_info.model_uri}")
+        print(f"Accuracy: {metrics['accuracy']:.4f}")
+        print(f"AUC Score: {metrics['auc_score']:.4f}")
 
 @test
 def test_output(*args) -> None:
-    registry_path = '/home/src/mlops_demo/model_registry'
-    latest_path = os.path.join(registry_path, 'latest.json')
-    assert os.path.exists(latest_path), 'Model registration failed'
-    print("✅ Model registry validation passed")
+    tracking_uri = os.getenv('MLFLOW_TRACKING_URI')
+    assert tracking_uri is not None and tracking_uri != '', 'MLFLOW_TRACKING_URI is not set'
+
+    registered_model_name = os.getenv('MLFLOW_REGISTERED_MODEL_NAME', 'churn-model')
+    client = MlflowClient(tracking_uri=tracking_uri)
+    client.get_registered_model(registered_model_name)
+    print('✅ MLflow model registry validation passed')

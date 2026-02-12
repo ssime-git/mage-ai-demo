@@ -1,0 +1,8 @@
+.git
+.DS_Store
+__pycache__
+*.pyc
+.mage_data
+mage_data
+mlops_demo/model_registry
+mlops_demo/models

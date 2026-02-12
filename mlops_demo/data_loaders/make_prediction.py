@@ -5,10 +5,40 @@ if 'test' not in globals():
 
 
 import joblib
-import json
 import os
 import pandas as pd
 import numpy as np
+import mlflow
+import mlflow.sklearn
+from mlflow.tracking import MlflowClient
+
+
+def _load_model_and_scaler():
+    tracking_uri = os.getenv('MLFLOW_TRACKING_URI')
+    if not tracking_uri:
+        raise Exception('MLFLOW_TRACKING_URI is not set. Please configure MLflow in your environment.')
+
+    model_name = os.getenv('MLFLOW_REGISTERED_MODEL_NAME', 'churn-model')
+    stage = os.getenv('MLFLOW_MODEL_STAGE', 'Production')
+
+    mlflow.set_tracking_uri(tracking_uri)
+    client = MlflowClient(tracking_uri=tracking_uri)
+
+    versions = client.get_latest_versions(model_name, stages=[stage])
+    if not versions:
+        versions = client.get_latest_versions(model_name)
+    if not versions:
+        raise Exception(f'No models found in MLflow registry for {model_name}. Run the training pipeline first.')
+
+    mv = versions[0]
+
+    model_uri = f'models:/{model_name}/{mv.version}'
+    model = mlflow.sklearn.load_model(model_uri)
+
+    scaler_local_path = client.download_artifacts(mv.run_id, 'preprocess/scaler.pkl')
+    scaler = joblib.load(scaler_local_path)
+
+    return model, scaler, str(mv.version)
 
 @data_loader
 def predict_customer_churn(*args, **kwargs):
@@ -33,19 +63,7 @@ def predict_customer_churn(*args, **kwargs):
     print(f"Input data: {input_data}")
     
     try:
-        # Load latest model
-        registry_path = '/home/src/mlops_demo/model_registry'
-        latest_file = os.path.join(registry_path, 'latest.json')
-        
-        with open(latest_file, 'r') as f:
-            latest_info = json.load(f)
-        
-        model_path = os.path.join(latest_info['path'], 'model.pkl')
-        scaler_path = os.path.join(latest_info['path'], 'scaler.pkl')
-        
-        # Load model and scaler
-        model = joblib.load(model_path)
-        scaler = joblib.load(scaler_path)
+        model, scaler, model_version = _load_model_and_scaler()
         
         # Prepare features
         feature_names = [
@@ -81,7 +99,7 @@ def predict_customer_churn(*args, **kwargs):
             'stay_probability': float(probabilities[0]),
             'confidence': float(max(probabilities)),
             'risk_level': 'High' if probabilities[1] > 0.7 else 'Medium' if probabilities[1] > 0.3 else 'Low',
-            'model_version': latest_info['version'],
+            'model_version': model_version,
             'timestamp': str(pd.Timestamp.now())
         }
         

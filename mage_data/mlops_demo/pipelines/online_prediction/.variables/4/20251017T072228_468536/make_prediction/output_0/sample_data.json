@@ -1,0 +1,1 @@
+{"customer_id": "HIGH_RISK_001", "prediction": 0, "prediction_text": "Will Stay", "churn_probability": 0.375, "stay_probability": 0.625, "confidence": 0.625, "risk_level": "Medium", "model_version": "v_20250522_112442", "timestamp": "2025-10-17 07:22:36.455105"}
