@@ -26,9 +26,16 @@ services:
       retries: 5
     restart: on-failure:5
 
+  # ============================================================================
+  # Mage Web Server - UI, API, and Orchestration
+  # Responsibility: Handle HTTP requests, serve UI, manage project state
+  # Scaling: Can run multiple instances behind a load balancer
+  # ============================================================================
   mage-web:
-    build: .
-    command: ["/app/run_app.sh", "mage", "start", "mlops_demo", "--instance-type", "web_server"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    command: ["/app/run_app.sh", "mage", "start", "mlops_demo", "--instance-type", "web_server", "--host", "0.0.0.0"]
     ports:
       - "6789:6789"
     environment:
@@ -42,6 +49,8 @@ services:
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       DATABASE_URL: ${DATABASE_URL:-postgresql://mage:mage@postgres:5432/mage}
+      # Development: Disable authentication for easy access
+      REQUIRE_USER_AUTHENTICATION: ${REQUIRE_USER_AUTHENTICATION:-0}
     volumes:
       - .:/home/src
     depends_on:
@@ -56,8 +65,16 @@ services:
       retries: 5
     restart: on-failure:5
 
+  # ============================================================================
+  # Mage Scheduler - Pipeline Scheduling and Trigger Management
+  # Responsibility: Monitor triggers and enqueue pipeline runs to execution queue
+  # Note: Requires REDIS_URL for distributed locking (prevents duplicate runs)
+  # Scaling: Can run multiple instances with Redis coordination
+  # ============================================================================
   mage-scheduler:
-    build: .
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.scheduler
     command: ["/app/run_app.sh", "mage", "start", "mlops_demo", "--instance-type", "scheduler"]
     environment:
       PROJECT_NAME: mlops_demo
@@ -78,12 +95,49 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python - <<'PY'\nimport socket, sys\nimport redis\n\nr = redis.from_url('${REDIS_URL:-redis://redis:6379/0}')\ntry:\n    r.ping()\n    sys.exit(0)\nexcept Exception:\n    sys.exit(1)\nPY"]
+      test: ["CMD-SHELL", "redis-cli -u ${REDIS_URL:-redis://redis:6379/0} ping || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: on-failure:5
 
+  # ============================================================================
+  # Optional: Mage Executor - For parallel pipeline execution
+  # Uncomment this section to add dedicated executor containers
+  # Adjust queue_size for parallel execution (default local_python supports ~20 parallel)
+  # For production: Use ECS, Kubernetes, or GCP Cloud Run executors via metadata.yaml
+  # ============================================================================
+  # mage-executor:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/Dockerfile.web
+  #   command: ["/app/run_app.sh", "mage", "start", "mlops_demo"]
+  #   environment:
+  #     PROJECT_NAME: mlops_demo
+  #     ENV: ${ENV:-dev}
+  #     USER_CODE_PATH: /home/src
+  #     REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  #     POSTGRES_DB: ${POSTGRES_DB:-mage}
+  #     POSTGRES_USER: ${POSTGRES_USER:-mage}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mage}
+  #     POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+  #     POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+  #     DATABASE_URL: ${DATABASE_URL:-postgresql://mage:mage@postgres:5432/mage}
+  #   volumes:
+  #     - .:/home/src
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   restart: on-failure:5
+
+  # ============================================================================
+  # Prediction Service - Independent microservice for model inference
+  # Responsibility: Serve predictions via HTTP API
+  # Technology: Flask + scikit-learn (separate from Mage)
+  # Scaling: Can run multiple instances independently
+  # ============================================================================
   prediction-service:
     build: ./mlops_demo/prediction_service
     ports:

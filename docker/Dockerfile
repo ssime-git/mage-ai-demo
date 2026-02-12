@@ -1,4 +1,4 @@
-FROM mageai/mageai:latest
+FROM mageai/mageai:0.9.79
 
 # Install jq and other useful tools
 USER root

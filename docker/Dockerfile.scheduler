@@ -1,0 +1,15 @@
+FROM mageai/mageai:0.9.79
+
+# Scheduler doesn't need UI tools, but may need redis-cli for health checks
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    redis-tools \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /home/src
+
+# Health check for scheduler - verify Redis connectivity
+HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
+    CMD redis-cli -u ${REDIS_URL:-redis://redis:6379/0} ping || exit 1
