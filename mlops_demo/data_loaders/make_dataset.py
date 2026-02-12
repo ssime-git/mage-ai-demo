@@ -2,7 +2,11 @@ import io
 import pandas as pd
 import requests
 import numpy as np
+import hashlib
+import json
 from sklearn.datasets import make_classification
+from datetime import datetime
+
 if 'data_loader' not in globals():
     from mage_ai.data_preparation.decorators import data_loader
 if 'test' not in globals():
@@ -12,6 +16,7 @@ if 'test' not in globals():
 def load_customer_data(*args, **kwargs):
     """
     Generate synthetic customer data for churn prediction
+    Includes data versioning with SHA256 hashing for lineage tracking
     """
     # Generate synthetic dataset
     X, y = make_classification(
@@ -40,9 +45,37 @@ def load_customer_data(*args, **kwargs):
     df['total_charges'] = df['monthly_charges'] * df['account_age']
     df['num_services'] = np.abs(df['num_services']).astype(int) % 10 + 1
     
-    print(f"Loaded {len(df)} customer records")
-    print(f"Churn rate: {df['churn'].mean():.2%}")
+    # Calculate data hash for versioning
+    data_hash = hashlib.sha256(pd.util.hash_pandas_object(df, index=True).values).hexdigest()
     
+    # Create data version identifier
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    data_version = f"data_v_{timestamp}"
+    
+    # Create data metadata
+    data_metadata = {
+        "version": data_version,
+        "timestamp": datetime.now().isoformat(),
+        "hash": data_hash,
+        "row_count": len(df),
+        "feature_count": len(feature_names),
+        "features": feature_names,
+        "target": "churn",
+        "churn_rate": float(df['churn'].mean()),
+        "data_shape": list(df.shape)
+    }
+    
+    # Store data metadata in kwargs for downstream blocks
+    if 'data_metadata' not in kwargs:
+        kwargs['data_metadata'] = data_metadata
+    
+    print(f"✅ Loaded {len(df)} customer records")
+    print(f"   Data Version: {data_version}")
+    print(f"   Data Hash: {data_hash}")
+    print(f"   Churn rate: {df['churn'].mean():.2%}")
+    print(f"   Shape: {df.shape}")
+    
+    # Return DataFrame with metadata attached
     return df
 
 @test
